@@ -52,7 +52,10 @@ def main():
         raise SystemExit(f"BLOCKED: {package} may conflict with an existing Telegram client")
     if package != EXPECTED_PACKAGE:
         raise SystemExit(f"BLOCKED: expected {EXPECTED_PACKAGE}, got {package}")
-    print("PASS: isolated GlassGram application ID confirmed")
+    label = re.search(r"^application-label:'([^']*)'", result.stdout, re.MULTILINE)
+    if not label or label.group(1) != "GlassGram":
+        raise SystemExit("BLOCKED: APK launcher label is not GlassGram")
+    print("PASS: GlassGram package and launcher label confirmed")
     print("Note: this does not verify provider authorities, login, or runtime behavior.")
 
 
