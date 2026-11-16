@@ -33,7 +33,8 @@ jobs:
       CCACHE_HARDLINK: "true"
       CCACHE_NOHASHDIR: "true"
       CCACHE_MAXSIZE: "2G"
-      NATIVE_TARGET: "universal"
+      # GlassGram phone builds only need arm64; avoid compiling x86_64 native code.
+      NATIVE_TARGET: ${{ github.ref_name == 'glassgram-ios26' && 'arm64-v8a' || 'universal' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
