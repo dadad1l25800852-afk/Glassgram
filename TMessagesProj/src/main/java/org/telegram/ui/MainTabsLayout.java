@@ -407,18 +407,20 @@ public class MainTabsLayout extends AnimatedLinearLayout {
                     final Paint.Style oldStyle = selectorPaint.getStyle();
                     final float oldStrokeWidth = selectorPaint.getStrokeWidth();
                     final Shader previousShader = selectorPaint.getShader();
+                    final boolean darkGlass = androidx.core.graphics.ColorUtils.calculateLuminance(
+                            Theme.getColor(Theme.key_windowBackgroundWhite, resourcesProvider)) < 0.45;
                     selectorPaint.setShader(new LinearGradient(
                             selectorRect.left, selectorRect.top,
                             selectorRect.right, selectorRect.bottom,
-                            new int[] { 0x80D8F1FF, 0x4478B7E8, 0x2470A3DB },
+                            darkGlass
+                                    ? new int[] { 0x8866B7EE, 0x66518BBE, 0x443C6B9B }
+                                    : new int[] { 0xBFFFFFFF, 0x887BC7F4, 0x5570A3DB },
                             null, Shader.TileMode.CLAMP));
                     canvas.drawRoundRect(selectorRect, r, r, selectorPaint);
                     selectorPaint.setShader(previousShader);
                     selectorPaint.setStyle(Paint.Style.STROKE);
                     selectorPaint.setStrokeWidth(dp(0.8f));
-                    final int glassRim = androidx.core.graphics.ColorUtils.calculateLuminance(
-                            Theme.getColor(Theme.key_windowBackgroundWhite, resourcesProvider)) < 0.45
-                            ? 0x99B8DEFF : 0xBFFFFFFF;
+                    final int glassRim = darkGlass ? 0x99B8DEFF : 0xBFFFFFFF;
                     selectorPaint.setColor(glassRim);
                     canvas.drawRoundRect(selectorRect, r, r, selectorPaint);
                     // Specular reflection along the upper edge: a separate thin
