@@ -426,6 +426,10 @@ public class MainTabsLayout extends AnimatedLinearLayout {
                     iosGlassMatrix.postTranslate(selectorRect.left, selectorRect.top);
                     final LinearGradient fill = darkGlass ? iosDarkFill : iosLightFill;
                     fill.setLocalMatrix(iosGlassMatrix);
+                    // Paint alpha multiplies shader alpha. The normal selector
+                    // uses a deliberately faint solid color; reset it for glass
+                    // or the gradient becomes nearly invisible.
+                    selectorPaint.setColor(0xFFFFFFFF);
                     selectorPaint.setShader(fill);
                     canvas.drawRoundRect(selectorRect, r, r, selectorPaint);
                     selectorPaint.setShader(previousShader);
