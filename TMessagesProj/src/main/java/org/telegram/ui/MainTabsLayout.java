@@ -421,6 +421,16 @@ public class MainTabsLayout extends AnimatedLinearLayout {
                             ? 0x99B8DEFF : 0xBFFFFFFF;
                     selectorPaint.setColor(glassRim);
                     canvas.drawRoundRect(selectorRect, r, r, selectorPaint);
+                    // Specular reflection along the upper edge: a separate thin
+                    // gradient stroke that fades away towards the bottom.
+                    selectorPaint.setStrokeWidth(dp(1.2f));
+                    selectorPaint.setShader(new LinearGradient(
+                            selectorRect.left, selectorRect.top,
+                            selectorRect.left, selectorRect.bottom,
+                            new int[] { 0xCCFFFFFF, 0x44FFFFFF, 0x00FFFFFF },
+                            new float[] { 0f, 0.36f, 1f }, Shader.TileMode.CLAMP));
+                    canvas.drawRoundRect(selectorRect, r, r, selectorPaint);
+                    selectorPaint.setShader(previousShader);
                     selectorPaint.setColor(oldColor);
                     selectorPaint.setStrokeWidth(oldStrokeWidth);
                     selectorPaint.setStyle(oldStyle);
