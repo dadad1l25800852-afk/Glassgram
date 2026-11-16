@@ -81,7 +81,14 @@ public final class MainTabsUiHelper {
 
     /** В M3 подложка прямоугольная, иначе скругление в половину высоты. */
     public static float getBackgroundRadius() {
-        return isMaterial3NavigationBar() ? 0 : AndroidUtilities.dp(MainTabsHelper.getMainTabsHeight() / 2f);
+        if (isMaterial3NavigationBar()) {
+            return 0;
+        }
+        // The iOS floating panel is a fully rounded capsule, even when
+        // the upstream fork uses a compact navigation height.
+        return AndroidUtilities.dp(isIosNavigationBar()
+                ? MainTabsHelper.getMainTabsHeightWithMargins() / 2f
+                : MainTabsHelper.getMainTabsHeight() / 2f);
     }
 
     /** В M3 и iOS-стиле панель растянута на всю ширину. */
