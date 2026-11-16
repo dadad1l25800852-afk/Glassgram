@@ -260,8 +260,10 @@ android {
         staging {
             debuggable = false
             jniDebuggable = false
-            minifyEnabled = true
-            shrinkResources = true
+            // Fast GlassGram diagnostic builds skip R8 to speed up CI and
+            // distinguish startup crashes caused by code shrinking.
+            minifyEnabled = System.getenv('GLASSGRAM_FAST_BUILD') != 'true'
+            shrinkResources = System.getenv('GLASSGRAM_FAST_BUILD') != 'true'
             multiDexEnabled = true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             matchingFallbacks = ['release', 'staging', 'debug']
