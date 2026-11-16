@@ -916,6 +916,20 @@ public class ApplicationLoader extends Application implements CameraXConfig.Prov
         Thread.setDefaultUncaughtExceptionHandler((thread, error) -> {
             app.exteraless.plugins.PluginsWatchdog.onUncaughtException(error);
             app.exteraless.crash.CrashLog.record(thread, error);
+            // On GlassGram startup failures, display a lightweight report UI
+            // without relying on Telegram fragments or Firebase initialization.
+            if ("app.glassgram.android".equals(getPackageName())) {
+                try {
+                    android.content.Intent reportIntent = new android.content.Intent(
+                            this, app.exteraless.crash.GlassGramCrashActivity.class);
+                    reportIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                            | android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                    startActivity(reportIntent);
+                    return;
+                } catch (Throwable ignored) {
+                    // Fall back to the platform handler below.
+                }
+            }
             if (AndroidUtil.shouldReportCrashToCrashlytics(error)) {
                 if (crashlyticsHandler != null) {
                     app.exteraless.crash.CrashLog.putCrashlyticsKeys(error);
