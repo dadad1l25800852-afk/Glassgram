@@ -9,6 +9,7 @@ import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.LinearGradient;
+import android.graphics.Matrix;
 import android.graphics.Shader;
 import android.view.MotionEvent;
 import android.view.View;
@@ -390,6 +391,17 @@ public class MainTabsLayout extends AnimatedLinearLayout {
 
 
 
+    // Reuse gradient objects while the selected tab animates at 60/120 Hz.
+    // Shader coordinates are normalized; only their local matrices change per frame.
+    private final LinearGradient iosLightFill = new LinearGradient(0, 0, 1, 1,
+            new int[] { 0xBFFFFFFF, 0x887BC7F4, 0x5570A3DB }, null, Shader.TileMode.CLAMP);
+    private final LinearGradient iosDarkFill = new LinearGradient(0, 0, 1, 1,
+            new int[] { 0x8866B7EE, 0x66518BBE, 0x443C6B9B }, null, Shader.TileMode.CLAMP);
+    private final LinearGradient iosReflection = new LinearGradient(0, 0, 0, 1,
+            new int[] { 0xCCFFFFFF, 0x44FFFFFF, 0x00FFFFFF },
+            new float[] { 0f, 0.36f, 1f }, Shader.TileMode.CLAMP);
+    private final Matrix iosGlassMatrix = new Matrix();
+
     @Override
     protected void dispatchDraw(@NonNull Canvas canvas) {
         if (drawCustomSelector) {
@@ -409,13 +421,12 @@ public class MainTabsLayout extends AnimatedLinearLayout {
                     final Shader previousShader = selectorPaint.getShader();
                     final boolean darkGlass = androidx.core.graphics.ColorUtils.calculateLuminance(
                             Theme.getColor(Theme.key_windowBackgroundWhite, resourcesProvider)) < 0.45;
-                    selectorPaint.setShader(new LinearGradient(
-                            selectorRect.left, selectorRect.top,
-                            selectorRect.right, selectorRect.bottom,
-                            darkGlass
-                                    ? new int[] { 0x8866B7EE, 0x66518BBE, 0x443C6B9B }
-                                    : new int[] { 0xBFFFFFFF, 0x887BC7F4, 0x5570A3DB },
-                            null, Shader.TileMode.CLAMP));
+                    iosGlassMatrix.reset();
+                    iosGlassMatrix.setScale(selectorRect.width(), selectorRect.height());
+                    iosGlassMatrix.postTranslate(selectorRect.left, selectorRect.top);
+                    final LinearGradient fill = darkGlass ? iosDarkFill : iosLightFill;
+                    fill.setLocalMatrix(iosGlassMatrix);
+                    selectorPaint.setShader(fill);
                     canvas.drawRoundRect(selectorRect, r, r, selectorPaint);
                     selectorPaint.setShader(previousShader);
                     selectorPaint.setStyle(Paint.Style.STROKE);
@@ -426,11 +437,8 @@ public class MainTabsLayout extends AnimatedLinearLayout {
                     // Specular reflection along the upper edge: a separate thin
                     // gradient stroke that fades away towards the bottom.
                     selectorPaint.setStrokeWidth(dp(1.2f));
-                    selectorPaint.setShader(new LinearGradient(
-                            selectorRect.left, selectorRect.top,
-                            selectorRect.left, selectorRect.bottom,
-                            new int[] { 0xCCFFFFFF, 0x44FFFFFF, 0x00FFFFFF },
-                            new float[] { 0f, 0.36f, 1f }, Shader.TileMode.CLAMP));
+                    iosReflection.setLocalMatrix(iosGlassMatrix);
+                    selectorPaint.setShader(iosReflection);
                     canvas.drawRoundRect(selectorRect, r, r, selectorPaint);
                     selectorPaint.setShader(previousShader);
                     selectorPaint.setColor(oldColor);
