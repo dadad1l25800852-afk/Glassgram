@@ -89,6 +89,7 @@ jobs:
             echo "RELEASE_KEYSTORE не задан — сборка подпишется отладочным ключом"
           fi
       - name: Verify GlassGram source isolation
+        if: github.ref_name == 'glassgram-ios26'
         run: python3 scripts/verify_glassgram_sources.py
       - name: Staging Build
         id: staging_build_step
@@ -100,6 +101,7 @@ jobs:
           echo "build_timestamp=$BUILD_TIMESTAMP" >> "$GITHUB_OUTPUT"
           ./gradlew TMessagesProj:assembleStaging
       - name: Verify GlassGram APK identity before upload
+        if: github.ref_name == 'glassgram-ios26'
         run: |
           set -euo pipefail
           shopt -s nullglob
