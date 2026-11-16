@@ -309,7 +309,15 @@ public class ApplicationLoader extends Application implements CameraXConfig.Prov
             app.exteraless.debug.EnergyProfiler.resumeIfEnabled(applicationContext);
         }
         SharedPrefsHelper.init(applicationContext);
-        FirebaseCrashlytics.getInstance().setCrashlyticsCollectionEnabled(AndroidUtil.shouldEnableCrashlytics());
+        // GlassGram uses a separate applicationId and has no matching Firebase
+        // google-services.json. Crashlytics must never prevent Telegram startup.
+        if (!"app.glassgram.android".equals(applicationContext.getPackageName())) {
+            try {
+                FirebaseCrashlytics.getInstance().setCrashlyticsCollectionEnabled(AndroidUtil.shouldEnableCrashlytics());
+            } catch (IllegalStateException firebaseNotConfigured) {
+                FileLog.e(firebaseNotConfigured);
+            }
+        }
         Utilities.globalQueue.postRunnable(app.exteraless.crash.CrashLog::reportOutOfMemory);
         for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) { //TODO improve account
             UserConfig.getInstance(a).loadConfig();
