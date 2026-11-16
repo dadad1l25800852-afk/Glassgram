@@ -393,7 +393,8 @@ public class MainTabsLayout extends AnimatedLinearLayout {
         if (drawCustomSelector) {
             final float x = animatedLongSelectedViewCenterX + animatedLongSelectedViewOffsetX;
             final float sWidth = getInterpolatedWidthByX(x, this);
-            if (MainTabsUiHelper.isMaterial3NavigationBar()) {
+            if (MainTabsUiHelper.isMaterial3NavigationBar() || MainTabsUiHelper.isIosNavigationBar()) {
+                // iOS: compact animated glass selection pill rather than a full-height block.
                 MainTabsUiHelper.setMainTabSelectedIndicatorBounds(selectorRect, sWidth,
                         getHeight() - getPaddingTop() - getPaddingBottom());
                 selectorRect.offset(x - sWidth / 2f, getPaddingTop());
