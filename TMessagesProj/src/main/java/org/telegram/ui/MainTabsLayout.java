@@ -399,7 +399,22 @@ public class MainTabsLayout extends AnimatedLinearLayout {
                         getHeight() - getPaddingTop() - getPaddingBottom());
                 selectorRect.offset(x - sWidth / 2f, getPaddingTop());
                 final float r = selectorRect.height() / 2f;
-                canvas.drawRoundRect(selectorRect, r, r, selectorPaint);
+                if (MainTabsUiHelper.isIosNavigationBar()) {
+                    // A thin, translucent rim gives the selected capsule a glass edge.
+                    final int oldColor = selectorPaint.getColor();
+                    final Paint.Style oldStyle = selectorPaint.getStyle();
+                    final float oldStrokeWidth = selectorPaint.getStrokeWidth();
+                    canvas.drawRoundRect(selectorRect, r, r, selectorPaint);
+                    selectorPaint.setStyle(Paint.Style.STROKE);
+                    selectorPaint.setStrokeWidth(dp(0.8f));
+                    selectorPaint.setColor(0x88D7F2FF);
+                    canvas.drawRoundRect(selectorRect, r, r, selectorPaint);
+                    selectorPaint.setColor(oldColor);
+                    selectorPaint.setStrokeWidth(oldStrokeWidth);
+                    selectorPaint.setStyle(oldStyle);
+                } else {
+                    canvas.drawRoundRect(selectorRect, r, r, selectorPaint);
+                }
             } else {
                 final float sHeight = getHeight() - getPaddingTop() - getPaddingBottom();
                 canvas.drawRoundRect(
