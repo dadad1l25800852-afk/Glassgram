@@ -217,10 +217,14 @@ public final class MainTabsUiHelper {
     }
 
     public static Drawable createMainTabsScrimBackground(Theme.ResourcesProvider resourcesProvider, boolean circle) {
-        final int color = Theme.getColor(Theme.key_windowBackgroundWhite, resourcesProvider);
+        final int baseColor = Theme.getColor(Theme.key_windowBackgroundWhite, resourcesProvider);
+        // Keep theme awareness; the iOS option adds only a subtle cool tint.
+        final int color = isIosNavigationBar()
+                ? androidx.core.graphics.ColorUtils.blendARGB(baseColor, 0xFF507FA6, 0.18f)
+                : baseColor;
         final ShapeDrawable drawable = circle
                 ? Theme.createCircleDrawable(AndroidUtilities.dp(40), color)
-                : Theme.createRoundRectDrawable(AndroidUtilities.dp(28), color);
+                : Theme.createRoundRectDrawable(AndroidUtilities.dp(isIosNavigationBar() ? 30 : 28), color);
         drawable.getPaint().setShadowLayer(AndroidUtilities.dp(6), 0, AndroidUtilities.dp(1), Theme.multAlpha(0xFF000000, 0.15f));
         if (!isMaterial3NavigationBar()) {
             return drawable;
