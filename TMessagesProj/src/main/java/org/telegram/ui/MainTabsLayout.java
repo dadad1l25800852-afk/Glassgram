@@ -416,7 +416,10 @@ public class MainTabsLayout extends AnimatedLinearLayout {
                     selectorPaint.setShader(previousShader);
                     selectorPaint.setStyle(Paint.Style.STROKE);
                     selectorPaint.setStrokeWidth(dp(0.8f));
-                    selectorPaint.setColor(0x88D7F2FF);
+                    final int glassRim = androidx.core.graphics.ColorUtils.calculateLuminance(
+                            Theme.getColor(Theme.key_windowBackgroundWhite, resourcesProvider)) < 0.45
+                            ? 0x99B8DEFF : 0xBFFFFFFF;
+                    selectorPaint.setColor(glassRim);
                     canvas.drawRoundRect(selectorRect, r, r, selectorPaint);
                     selectorPaint.setColor(oldColor);
                     selectorPaint.setStrokeWidth(oldStrokeWidth);
