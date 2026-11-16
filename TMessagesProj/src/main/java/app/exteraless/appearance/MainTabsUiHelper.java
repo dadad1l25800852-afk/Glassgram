@@ -46,7 +46,7 @@ public final class MainTabsUiHelper {
 
     /** В iOS-стиле обёртка добавляет к системным инсетам ещё 8dp по бокам — вместе с подложкой выходит 16dp. */
     private static int getWrapperSideInset() {
-        return isIosNavigationBar() ? AndroidUtilities.dp(8) : 0;
+        return isIosNavigationBar() ? AndroidUtilities.dp(12) : 0;
     }
 
     /** M3 — 64dp, иначе высота из MainTabsHelper. */
@@ -75,7 +75,7 @@ public final class MainTabsUiHelper {
 
     /** В M3 подложка без отступа от краёв. */
     public static int getBackgroundInset() {
-        return isMaterial3NavigationBar() ? 0 : AndroidUtilities.dp(MainTabsHelper.getMainTabsMargin() - 0.334f);
+        return isMaterial3NavigationBar() ? 0 : AndroidUtilities.dp(isIosNavigationBar() ? 3.5f : MainTabsHelper.getMainTabsMargin() - 0.334f);
     }
 
     /** В M3 подложка прямоугольная, иначе скругление в половину высоты. */
@@ -159,8 +159,8 @@ public final class MainTabsUiHelper {
     }
 
     public static void setMainTabSelectedIndicatorBounds(RectF rectF, float width, int height) {
-        final float w = Math.min(AndroidUtilities.dp(56), Math.max(0, width - AndroidUtilities.dp(4) * 2));
-        final float h = Math.min(AndroidUtilities.dp(32), height);
+        final float w = Math.min(AndroidUtilities.dp(isIosNavigationBar() ? 72 : 56), Math.max(0, width - AndroidUtilities.dp(4) * 2));
+        final float h = Math.min(AndroidUtilities.dp(isIosNavigationBar() ? 40 : 32), height);
         final float x = (width - w) / 2f;
         final float y = MainTabsHelper.isMainTabsHideTitleStyle()
                 ? (height - h) / 2f
