@@ -8,6 +8,8 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.LinearGradient;
+import android.graphics.Shader;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -404,7 +406,14 @@ public class MainTabsLayout extends AnimatedLinearLayout {
                     final int oldColor = selectorPaint.getColor();
                     final Paint.Style oldStyle = selectorPaint.getStyle();
                     final float oldStrokeWidth = selectorPaint.getStrokeWidth();
+                    final Shader previousShader = selectorPaint.getShader();
+                    selectorPaint.setShader(new LinearGradient(
+                            selectorRect.left, selectorRect.top,
+                            selectorRect.right, selectorRect.bottom,
+                            new int[] { 0x80D8F1FF, 0x4478B7E8, 0x2470A3DB },
+                            null, Shader.TileMode.CLAMP));
                     canvas.drawRoundRect(selectorRect, r, r, selectorPaint);
+                    selectorPaint.setShader(previousShader);
                     selectorPaint.setStyle(Paint.Style.STROKE);
                     selectorPaint.setStrokeWidth(dp(0.8f));
                     selectorPaint.setColor(0x88D7F2FF);
