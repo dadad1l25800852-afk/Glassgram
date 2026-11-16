@@ -132,6 +132,13 @@ public final class MainTabsUiHelper {
                     .setStrokeColorBottom(0, 0)
                     .setStrokeWidth(0, 0);
         }
+        if (isIosNavigationBar()) {
+            // Soft blue glass edge, limited to the existing opt-in iOS navigation mode.
+            return builder
+                    .setStrokeColorTop(0x668BCFFF, 0x66D8F4FF)
+                    .setStrokeColorBottom(0x336EA8D8, 0x55B8E3FF)
+                    .setStrokeWidth(AndroidUtilities.dpf2(0.85f), AndroidUtilities.dpf2(0.85f));
+        }
         return builder
                 .setStrokeColorTop(0x11000000, 0x06FFFFFF)
                 .setStrokeColorBottom(0x20000000, 0x11FFFFFF)
@@ -162,6 +169,10 @@ public final class MainTabsUiHelper {
     }
 
     public static int getMainTabSelectedIndicatorColor(int color, float factor) {
+        if (isIosNavigationBar()) {
+            // A stronger selection highlight, without changing other navigation styles.
+            return Theme.multAlpha(0xFF73BAF5, factor * 0.28f);
+        }
         return Theme.multAlpha(color, factor * 0.125f);
     }
 
