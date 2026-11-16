@@ -96,6 +96,18 @@ jobs:
           export BUILD_TIMESTAMP=$(date +%s)
           echo "build_timestamp=$BUILD_TIMESTAMP" >> "$GITHUB_OUTPUT"
           ./gradlew TMessagesProj:assembleStaging
+      - name: Verify GlassGram APK identity before upload
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          apks=(TMessagesProj/build/outputs/apk/staging/*.apk)
+          if [ "${#apks[@]}" -eq 0 ]; then
+            echo "::error::No staging APK was produced"
+            exit 1
+          fi
+          for apk in "${apks[@]}"; do
+            python3 scripts/verify_glassgram_apk.py "$apk"
+          done
       - name: Upload arm64-v8a Artifact
         uses: actions/upload-artifact@v7
         with:
