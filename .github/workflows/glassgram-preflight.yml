@@ -1,0 +1,26 @@
+name: GlassGram safety preflight
+
+on:
+  push:
+    branches:
+      - glassgram-ios26
+    paths:
+      - 'TMessagesProj/build.gradle'
+      - 'TMessagesProj/src/main/AndroidManifest.xml'
+      - 'gradle.properties'
+      - 'scripts/verify_glassgram_sources.py'
+      - '.github/workflows/glassgram-preflight.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout GlassGram
+        uses: actions/checkout@v4
+      - name: Check isolated application identity and providers
+        run: python3 scripts/verify_glassgram_sources.py
