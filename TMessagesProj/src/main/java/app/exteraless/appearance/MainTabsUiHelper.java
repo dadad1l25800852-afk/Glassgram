@@ -32,8 +32,13 @@ public final class MainTabsUiHelper {
     private MainTabsUiHelper() {
     }
 
+    private static boolean isGlassGram() {
+        return org.telegram.messenger.ApplicationLoader.applicationContext != null
+                && "app.glassgram.android".equals(org.telegram.messenger.ApplicationLoader.applicationContext.getPackageName());
+    }
+
     public static boolean isMaterial3NavigationBar() {
-        return AppearanceConfig.newNavigationBarStyle() && !MainTabsLayout.isBottomNavigationFloating();
+        return AppearanceConfig.newNavigationBarStyle() && !MainTabsLayout.isBottomNavigationFloating() && !isGlassGram();
     }
 
     /**
@@ -42,7 +47,7 @@ public final class MainTabsUiHelper {
      * поэтому все размеры считаются через MainTabsHelper. M3 приоритетнее.
      */
     public static boolean isIosNavigationBar() {
-        return AppearanceConfig.iosNavigationBarStyle() && !isMaterial3NavigationBar();
+        return (AppearanceConfig.iosNavigationBarStyle() || isGlassGram()) && !isMaterial3NavigationBar();
     }
 
     /** В iOS-стиле обёртка добавляет к системным инсетам ещё 8dp по бокам — вместе с подложкой выходит 16dp. */
@@ -235,7 +240,7 @@ public final class MainTabsUiHelper {
                         dark ? 0xFF7EA5D3 : 0xFFCEE9FF, dark ? 0.24f : 0.20f)
                 : baseColor;
         final int color = iosGlass
-                ? Color.argb(dark ? 202 : 214, Color.red(tinted), Color.green(tinted), Color.blue(tinted))
+                ? Color.argb(dark ? 164 : 182, Color.red(tinted), Color.green(tinted), Color.blue(tinted))
                 : tinted;
         final ShapeDrawable drawable = circle
                 ? Theme.createCircleDrawable(AndroidUtilities.dp(40), color)
