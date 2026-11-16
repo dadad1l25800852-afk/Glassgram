@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - canary
+      - glassgram-ios26
     paths-ignore:
       - '**.md'
       - '.github/**'
