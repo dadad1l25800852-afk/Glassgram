@@ -1,6 +1,7 @@
 package app.exteraless.appearance;
 
 import android.graphics.RectF;
+import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.InsetDrawable;
 import android.graphics.drawable.ShapeDrawable;
@@ -218,14 +219,23 @@ public final class MainTabsUiHelper {
 
     public static Drawable createMainTabsScrimBackground(Theme.ResourcesProvider resourcesProvider, boolean circle) {
         final int baseColor = Theme.getColor(Theme.key_windowBackgroundWhite, resourcesProvider);
-        // Keep theme awareness; the iOS option adds only a subtle cool tint.
-        final int color = isIosNavigationBar()
-                ? androidx.core.graphics.ColorUtils.blendARGB(baseColor, 0xFF507FA6, 0.18f)
+        // Preserve dark/light theme luminance while allowing the underlying content
+        // to show through. The blur provider is responsible for actual background blur.
+        final boolean iosGlass = isIosNavigationBar();
+        final boolean dark = androidx.core.graphics.ColorUtils.calculateLuminance(baseColor) < 0.45;
+        final int tinted = iosGlass
+                ? androidx.core.graphics.ColorUtils.blendARGB(baseColor,
+                        dark ? 0xFF7EA5D3 : 0xFFCEE9FF, dark ? 0.24f : 0.20f)
                 : baseColor;
+        final int color = iosGlass
+                ? Color.argb(dark ? 202 : 214, Color.red(tinted), Color.green(tinted), Color.blue(tinted))
+                : tinted;
         final ShapeDrawable drawable = circle
                 ? Theme.createCircleDrawable(AndroidUtilities.dp(40), color)
-                : Theme.createRoundRectDrawable(AndroidUtilities.dp(isIosNavigationBar() ? 30 : 28), color);
-        drawable.getPaint().setShadowLayer(AndroidUtilities.dp(6), 0, AndroidUtilities.dp(1), Theme.multAlpha(0xFF000000, 0.15f));
+                : Theme.createRoundRectDrawable(AndroidUtilities.dp(iosGlass ? 30 : 28), color);
+        drawable.getPaint().setShadowLayer(AndroidUtilities.dp(iosGlass ? 12 : 6),
+                0, AndroidUtilities.dp(iosGlass ? 3 : 1),
+                Theme.multAlpha(0xFF000000, iosGlass ? 0.22f : 0.15f));
         if (!isMaterial3NavigationBar()) {
             return drawable;
         }
