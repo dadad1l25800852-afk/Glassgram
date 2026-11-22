@@ -1,224 +1,302 @@
-<div align="center">
+# YouFree + Happ-совместимые подписки · версия 0.2
 
-<img src="assets/logo.png" width="128" alt="exteraless">
+> **Статус:** исходный код Android-приложения и рабочего Go-backend. Kotlin-парсер
+> и Go-сервер проверены локально; Android APK, воспроизведение YouTube и работу
+> на сети российского провайдера **не удалось проверить** в этой среде.
 
-# exteraless
+## Что изменилось по запросу
 
-Открытая версия exteraGram — с моделью разрешений для плагинов
+В YouFree появился **встроенный сетевой модуль на открытом XTLS/libXray**.
+Приложение **не является модификацией или копией проприетарного Happ**, но
+умеет импортировать часть тех же открытых подписок и серверов.
+Ни отдельный Happ, ни Android VPN, ни root для этого варианта не нужны.
+Сеть переключается только внутри WebView приложения, **не в отдельном
+официальном приложении YouTube на телефоне**.
 
-[![Канал](https://img.shields.io/badge/Telegram-@exteraless-2CA5E0?logo=telegram&logoColor=white)](https://t.me/exteraless)
+**Как пользоваться после успешной сборки и установки APK:**
 
-</div>
+1. Открой YouFree → шестерёнка → **Подключение Happ**.
+2. Вставь **обычную HTTPS-ссылку подписки** либо `vless://`, `trojan://`,
+   `ss://`, `socks://`, `hysteria2://`, `hy2://` или совместимую `vmess://` ссылку.
+   Поддерживаются простые `happ://add/` обёртки.
+3. Нажми **«Импортировать и выбрать сервер»**. Приложение получает открытые
+   конфигурации, проверяет соединение к YouTube `generate_204` через Xray
+   и выбирает сервер с минимальной измеренной задержкой.
+4. После успешной проверки откроется **обычная мобильная страница YouTube**
+   `https://m.youtube.com/` в WebView. Это YouTube как сайт, а не
+   самодельный плеер. Для этого пути не нужен свой API-сервер.
+5. Кнопка обновления рядом с названием сервера пробует следующий. При
+   ошибке загрузки основной страницы WebView есть до двух попыток смены
+   сервера автоматически.
 
----
+**Ограничения:**
 
-## Что это
+- `happ://crypt…` (`crypt`, `crypt2`, `crypt3`, `crypt4`, `crypt5` и т.п.)
+  — **проприетарные зашифрованные ссылки Happ**, не импортируются. Попроси
+  своего провайдера дать обычную HTTPS-подписку или отдельную открытую
+  конфигурацию. Не нужно сообщать нам пароль или саму подписку.
+- XTLS/libXray v26.11.9 не поддерживает legacy VMess QR (`vmess://` с
+  Base64(JSON)), Clash/Mihomo YAML и некоторые нестандартные транспорты.
+- Встроенный WebView может не воспроизводить отдельные YouTube-видео из-за
+  политики YouTube, браузерных кодеков, авторизации или DRM; подтвердить
+  универсальную совместимость нельзя. Измерение задержки не проверяет
+  передачу видеосегментов и пропускную способность.
+- Переключение не переносит активное TLS-соединение: видео или страница
+  могут перезагрузиться, и текущее место просмотра не обязательно сохранится.
+- Без подписки/доступного сервера нет гарантированного обхода блокировки.
+  Бесплатные общедоступные прокси в проекте не встроены.
+- Видеолента, поиск и локальные подписки из исходного **нативного** YouFree
+  сохранены, но для их метаданных по-прежнему требуется свой API-backend.
+  Обычный YouTube открыт отдельной кнопкой с глобусом.
+- Приложение **не перехватывает трафик других Android-приложений**; официальное
+  приложение YouTube, установленное отдельно, продолжит использовать обычную сеть.
 
-exteraless — форк [NagramX](https://github.com/risin42/NagramX), в котором возможности
-exteraGram реализованы с открытым исходным кодом. Основа — Telegram для Android 13.1.1.
+## Сборка нового APK на GitHub с телефона
 
-Отдельный упор — **безопасность плагинов**. В exteraGram плагин не ограничен ни в чём;
-здесь у него есть модель разрешений: плагин объявляет, что ему нужно, это
-видно на экране установки, и получает он только то, что вы разрешили.
+1. Создай публичный или приватный репозиторий GitHub и загрузи **содержимое**
+   папки `YouFree` (включая скрытую `.github/workflows/android-apk.yml`).
+2. Перейди на GitHub во вкладку **Actions → Build YouFree APK → Run workflow**.
+3. Workflow запускает тесты Go, скачивает **только с официального релиза**
+   `XTLS/libXray` нативную Android-библиотеку v26.11.9 и собирает debug APK
+   с Gradle 8.11.1, JDK 17, Android SDK 35.
+4. Если сборка прошла, открой запуск → **Artifacts → YouFree-Android-APK**,
+   скачай ZIP и извлеки `YouFree.apk` на телефон.
+5. Если GitHub Actions упал, APK ещё не готов: необходимо увидеть журнал
+   ошибки и исправить проект. Успешная компиляция и успешное воспроизведение
+   ещё не подтверждены.
 
-Проект **в бете**: часть возможностей exteraGram ещё не перенесена. Если заметили, что
-каких-то функций не хватает, — откройте issue или напишите в [канал](https://t.me/exteraless?direct).
+Для локальной Android Studio сборки нужна `app/libs/libXray.aar` из
+[официального релиза XTLS/libXray v26.11.9](https://github.com/XTLS/libXray/releases/tag/v26.11.9),
+так как бинарные файлы в этот исходный архив не включены. При сборке из
+GitHub Actions библиотека скачивается автоматически. Не используй неизвестные
+зеркала AAR.
 
-* Имя пакета: `com.exteraless.app`
-* Только 64-битные устройства (`arm64-v8a`, `x86_64`)
+### Как устроено подключение
 
-### Что внутри
+```text
+Ввод HTTPS-подписки / открытых ключей сервера
+        ↓
+HappSubscription: HTTPS + проверка лимита/формата
+        ↓
+libXray: конвертация ссылок → Xray outbound-конфигурации
+        ↓
+libXray pingBatch (YouTube generate_204) → оценка задержек
+        ↓
+Лучший доступный сервер → встроенный HTTP CONNECT прокси
+        ↓
+Android WebView ProxyController → https://m.youtube.com
+```
 
-**Плагины**
+На прокси Xray используется только входящий порт `127.0.0.1` телефона.
+Google-трафик проходит через него по HTTPS без расшифровки Google TLS.
+Прокси на localhost без отдельного пароля теоретически доступен другим
+локальным приложениям; для коммерческого распространения требуется
+дополнительный аудит изоляции и защиты. Секретная подписка хранится в
+Keystore-зашифрованных настройках (но передаётся своему серверу подписки при
+обновлении, как и в других подписочных клиентах).
 
-* Совместимость с плагинами exteraGram: одиночные `.plugin`, архивы `.elyx`/`.eaf`,
-  плагины с DEX и хуки Java-методов (Xposed API)
-* Разрешения: сеть, файлы, чтение и отправка сообщений, интенты, настройки, хуки,
-  нативные библиотеки. Запрос без разрешения тихо отклоняется и попадает в журнал
-* Журнал активности плагина с поиском и экспортом
-* Защита от падений: плагин, который раз за разом роняет приложение, отключается;
-  после нескольких падений на старте включается безопасный режим
-* Экспорт и импорт всех плагинов вместе с настройками
-* Python 3.11 на своей сборке [Chaquopy](https://github.com/exteraless/chaquopy)
-
-**Клиент**
-
-* Настройки exteraGram: оформление, чаты, иконпаки, боковое меню, полоса пилюль,
-  поиск по настройкам
-* Плеер в стиле Material 3 с настраиваемой обложкой, мини-плеером, очередью
-  и синхронизированными текстами песен
-* Режим призрака и сохранение удалённых и отредактированных сообщений
-  (с исключениями по чатам)
-* Своя ИИ-служба вместо встроенных в Telegram редактора и пересказов
-* Темы Monet, включая стиль Inugram
-* Вход на другие устройства по QR из бокового меню
-
-### Ссылки
-
-* Канал: [@exteraless](https://t.me/exteraless)
-* Исходники: [github.com/exteraless/exteraless](https://github.com/exteraless/exteraless)
-
-### Сборка
-
-Понадобятся JDK 21, Android SDK с NDK и CMake, Python 3.11 на машине сборки.
-
-1. Склонировать репозиторий вместе с подмодулями:
-
-    ```bash
-    git clone --recursive --shallow-submodules https://github.com/exteraless/exteraless.git exteraless
-    ```
-
-    Если репозиторий уже склонирован без подмодулей:
-
-    ```bash
-    git submodule update --init --recursive --depth=1
-    ```
-
-2. Получить `TELEGRAM_APP_ID` и `TELEGRAM_APP_HASH` на [my.telegram.org](https://my.telegram.org/auth)
-   и создать `local.properties` в корне проекта:
-
-   ```properties
-   TELEGRAM_APP_ID=<ваш_app_id>
-   TELEGRAM_APP_HASH=<ваш_app_hash>
-   ```
-
-   Если `python3` в системе не 3.11, указать нужный интерпретатор:
-
-   ```properties
-   CHAQUOPY_BUILD_PYTHON=/usr/bin/python3.11
-   ```
-
-3. Для подписи APK положить свой `TMessagesProj/release.keystore` и дописать в `local.properties`:
-
-   ```properties
-   KEYSTORE_PASS=<пароль_хранилища>
-   ALIAS_NAME=<имя_ключа>
-   ALIAS_PASS=<пароль_ключа>
-   ```
-
-   Ключа в репозитории нет намеренно. Без него сборка не падает — APK подписывается
-   отладочным ключом Android.
-
-4. Для push-уведомлений заменить `TMessagesProj/google-services.json` своим
-   (Firebase, имя пакета `com.exteraless.app`).
-
-5. Необязательно: свои ключи в `local.properties` — `MAPS_API_KEY` (Google Maps; ключ
-   привязан к пакету и подписи, поэтому чужой показывает пустую карту) и `GLYPH_API_KEY`
-   (Nothing Glyph). Для канала метаданных — его числовой id без префикса `-100`
-   в `BaseRemoteHelper.CHANNEL_METADATA_ID`.
-
-6. Собрать: `./gradlew :TMessagesProj:assembleDebug` или открыть проект в Android Studio.
-   Среда выполнения Python собирается из подмодуля `TMessagesProj/chaquopy` во время
-   сборки; Cython для этого ставится сам.
-
-**Про ABI.** Переменная `NATIVE_TARGET` задаёт цель: `arm64-v8a` или `x86_64` (один ABI,
-быстрее), пусто или `universal` (один APK с обоими ABI), `SKIP` (без нативной части —
-только Java и ресурсы). 32-битные ABI не собираются.
-
-### Сборка через GitHub Actions
-
-Нужны два секрета репозитория:
-
-* `LOCAL_PROPERTIES` — содержимое `local.properties` в base64:
-
-  ```bash
-  base64 -w0 local.properties
-  ```
-
-* `RELEASE_KEYSTORE` — файл ключа в base64:
-
-  ```bash
-  base64 -w0 TMessagesProj/release.keystore
-  ```
-
-Дальше запустить workflow **Release Build**. Готовый APK лежит в артефактах прогона.
-
-### Авторы дизайна
-
-Иконки и оформление, унаследованные от exteraGram, созданы его дизайнером —
-[@the8055u](https://t.me/the8055u) и студией [@BlueprintDsgn](https://t.me/BlueprintDsgn).
-Права на эти материалы принадлежат авторам.
-
-### Благодарности
-
-- [AyuGram](https://github.com/AyuGram/AyuGram4A)
-- [Cherrygram](https://github.com/arsLan4k1390/Cherrygram)
-- [Dr4iv3rNope](https://github.com/Dr4iv3rNope/NotSoAndroidAyuGram)
-- [exteraGram](https://github.com/exteraSquad/exteraGram)
-- [Inugram](https://github.com/teidesu/inugram)
-- [Nagram](https://github.com/NextAlone/Nagram)
-- [NagramX](https://github.com/risin42/NagramX)
-- [Nekogram](https://github.com/Nekogram/Nekogram)
-- [OctoGram](https://github.com/OctoGramApp/OctoGram)
+**Исходные технические документы:**
+- https://github.com/Flyfrog-LLC/Happ-docs/blob/main/faq/adding-configuration-subscription.md
+- https://github.com/XTLS/libXray#api
+- https://github.com/XTLS/libXray/releases/tag/v26.11.9
+- https://developer.android.com/reference/androidx/webkit/ProxyController
 
 ---
 
-## English
+## Сохранённый первый вариант YouFree (свой Go HTTPS relay)
 
-### What this is
+Ниже описание прежнего нативного YouFree и его отдельного серверного маршрута.
+Это по-прежнему доступно **опционально** и не требуется для просмотра
+мобильной страницы YouTube через импортированную Happ-совместимую подписку.
 
-exteraless is a fork of [NagramX](https://github.com/risin42/NagramX) that implements
-exteraGram's features open-source. It is based on Telegram for Android 13.1.1.
+# YouFree — Android + HTTPS CONNECT relay
 
-The special focus is **plugin security**. In exteraGram a plugin is not restricted in
-any way; here it comes with a permission model: a plugin declares what it needs, you
-see that on the install sheet, and it gets only what you allow.
+**Status: source-code prototype; backend tests pass, Android build and Russian network playback NOT verified.**
 
-The project is **in beta**: some exteraGram features have not been ported yet. If you
-notice a missing feature, open an issue or write to the [channel](https://t.me/exteraless?direct).
+YouFree is a native Kotlin / Jetpack Compose video discovery app (Android 10+).
+It uses the official YouTube Data API v3 for metadata and the official YouTube iframe
+player for video. It contains an *opt-in* local HTTP CONNECT proxy for its WebView
+which connects to a personally operated HTTPS relay. No Android `VpnService` or root.
+Media3/ExoPlayer handles independently licensed HLS, DASH and MP4 streams.
 
-* Package name: `com.exteraless.app`
-* 64-bit devices only (`arm64-v8a`, `x86_64`)
+## What works in source / what is not implemented
 
-### What's inside
+| Feature | Implementation / limitation |
+| --- | --- |
+| Home, search, channel, thumbnails | YouTube Data API key on backend; official API quota applies |
+| YouTube playback | Embedded YouTube player; not using Media3 for YouTube |
+| Without Android VPN | WebView proxy → 127.0.0.1 → TLS remote relay → direct HTTPS to YouTube |
+| Direct / relay choice | One Youtube connectivity probe + low-latency reachable relay selection |
+| Relay failover | Retries CONNECT on configured servers, reloads iframe after prolonged buffering |
+| Shorts | Vertical native pager of videos searched with `#shorts` (not official Shorts feed) |
+| Read comments | Read-only via YouTube Data API; may be disabled per video |
+| History, saved, subscriptions | Stored locally, NOT synchronized with Google |
+| Quality, 60fps, 4K | Available only through YouTube's embedded player controls / video itself |
+| PiP/fullscreen | Android PiP attempt and embedded player fullscreen support; needs device testing |
+| Media3 | Separate test/authorized stream screen; HLS/DASH/MP4, HTTP Range, speed controls |
+| Google login, writes (like/comment), synced playlists | Not implemented; do not store Google passwords |
+| Background playback, persistent video mini-player | Not implemented |
+| YouTube 120Hz performance | No measured guarantee; Compose uses device refresh rate |
+| Fully automatic seamless mid-TLS stream switching | Impossible for this design; relay switches for new connections, iframe reload may occur |
 
-* exteraGram plugins: single-file `.plugin`, `.elyx`/`.eaf` archives, DEX plugins and
-  Java method hooks (Xposed API)
-* Permissions for network, files, reading and sending messages, intents, settings, hooks
-  and native libraries; denied calls fail quietly and go to the plugin's activity log
-* Crash protection: a plugin that keeps crashing the app is disabled, repeated launch
-  crashes bring up safe mode
-* Export and import of all plugins with their settings
-* Python 3.11 on our own [Chaquopy](https://github.com/exteraless/chaquopy) build
-* exteraGram settings, a Material 3 music player with synced lyrics, ghost mode, saved
-  deleted and edited messages, Monet themes, QR login for other devices
+## Network architecture
 
-### Building
+```
+[Compose UI] --- HTTPS + Bearer ---> [Go API: YouTube Data API metadata]
+      |                                 [Go API: signed-off media with Range]
+[YouTube official iframe inside WebView]
+      |                    DIRECT if HTTPS probe succeeds
+      +---- WebView proxy override ----> localhost:ephemeral (Kotlin CONNECT proxy)
+                                              | certificate-validated TLS
+                                              | Proxy-Authorization: Bearer <relay token>
+                                              v
+                                       Self-owned Go HTTPS relay
+                                              | CONNECT allowlisted :443 destinations
+                                              v
+                                         youtube.com / googlevideo.com / ytimg.com
 
-You need JDK 21, the Android SDK with NDK and CMake, and Python 3.11 on the build machine.
+Google HTTPS between WebView and Google remains encrypted end-to-end. The relay
+sees destination hosts and traffic sizes, NOT Google TLS content or passwords.
+```
 
-1. Clone with submodules:
+**Why the iframe?** The YouTube Data API does not grant raw media URLs. YouTube
+API policies prohibit separating or changing the audiovisual components of YouTube
+content. Running a YouTube-like substitute application can also raise compliance
+issues; review the latest YouTube developer policies before distribution. No claim
+of Google endorsement. The relay MUST NOT rewrite the YouTube player or strip ads.
 
-    ```bash
-    git clone --recursive --shallow-submodules https://github.com/exteraless/exteraless.git exteraless
-    ```
+**Not guaranteed in Russia.** The server's IP/domain must be reachable from the
+specific Russian ISP. WebView must support `WebViewFeature.PROXY_OVERRIDE`, and
+Google must allow the embed on that device. `generate_204` is only a partial reachability
+probe; CDN/media failures may be discovered later. This has not been tested on a
+Russian phone. No public/free proxy server list is shipped.
 
-2. Get `TELEGRAM_APP_ID` and `TELEGRAM_APP_HASH` from [my.telegram.org](https://my.telegram.org/auth)
-   and put them into `local.properties` in the project root. If `python3` is not 3.11,
-   set `CHAQUOPY_BUILD_PYTHON` there to a 3.11 interpreter.
+## Requirements
 
-3. For release signing, drop your own `TMessagesProj/release.keystore` and add
-   `KEYSTORE_PASS`, `ALIAS_NAME`, `ALIAS_PASS` to `local.properties`. No keystore is
-   shipped with the repository; without one the build is signed with the Android debug key.
+- Android Studio (with JDK 17, Android SDK 35), Android 10+ phone
+- A VPS located where official Google services are reachable
+- A domain you own, pointing via DNS A/AAAA records to your VPS
+- TCP/443 open from the phone to that VPS; a publicly trusted TLS certificate
+- A YouTube Data API v3 key created in Google Cloud Console (quota applies)
+- Docker / Docker Compose to deploy backend; optional `ffmpeg` for sample media
 
-4. For push notifications, replace `TMessagesProj/google-services.json` with your own
-   Firebase config for `com.exteraless.app`.
+## Deploy your backend server
 
-5. Optional: `MAPS_API_KEY` and `GLYPH_API_KEY` in `local.properties`, and your metadata
-   channel id (without `-100`) in `BaseRemoteHelper.CHANNEL_METADATA_ID`.
+1. On the server, set the DNS A record of **your actual domain** to its VPS IP.
+2. Obtain a certificate for that domain with a trusted CA, for example:
 
-6. Build with `./gradlew :TMessagesProj:assembleDebug` or from Android Studio. The Python
-   runtime is built from the `TMessagesProj/chaquopy` submodule during the build.
+   ```sh
+   sudo certbot certonly --standalone -d YOUR_REAL_DOMAIN
+   ```
 
-`NATIVE_TARGET` selects the ABI: `arm64-v8a` or `x86_64` (one ABI, faster), empty or
-`universal` (one APK with both), `SKIP` (no native part). 32-bit ABIs are not built.
+   Certbot typically requires TCP/80 for HTTP validation. You may use DNS
+   validation instead. Adapt renewal to your CA provider.
 
-For CI, set two repository secrets — `LOCAL_PROPERTIES` and `RELEASE_KEYSTORE`, both
-base64-encoded — and run the **Release Build** workflow. The APK ends up in the run
-artifacts.
+3. Inside `backend`, copy `.env.example` to `.env`. Set a strong `YOUFREE_TOKEN`
+   (`openssl rand -hex 32`) and your actual `YOUTUBE_API_KEY`.
+4. Copy (do not symlink to an inaccessible directory) certificate and private key
+   to `backend/certs/fullchain.pem` and `backend/certs/privkey.pem`.
+   **Protect the private key:** the Docker image uses UID/GID 10001; ensure its
+   group has read access with e.g. `chgrp 10001 certs/*.pem` and
+   `chmod 0640 certs/*.pem`. Restrict access to `backend/certs` itself.
+5. From `backend` run:
 
-### Design credits
+   ```sh
+   docker compose up -d --build
+   ```
 
-Icons and visual design inherited from exteraGram are the work of its designer,
-[@the8055u](https://t.me/the8055u), and the [@BlueprintDsgn](https://t.me/BlueprintDsgn)
-studio. Rights to those materials belong to their authors.
+6. Check service (replace host and token with your actual values):
+
+   ```sh
+   curl -fsS https://YOUR_REAL_DOMAIN/health
+   curl -fsS -H 'Authorization: Bearer YOUR_REAL_TOKEN' \
+      https://YOUR_REAL_DOMAIN/api/v1/status
+   ```
+
+7. Test **actual CONNECT through the relay** (if this gives HTTP 204, the
+   server can reach a YouTube endpoint; this does not prove video playback):
+
+   ```sh
+   curl -v --proxy https://YOUR_REAL_DOMAIN:443 \
+     --proxy-header 'Proxy-Authorization: Bearer YOUR_REAL_TOKEN' \
+     'https://www.youtube.com/generate_204'
+   ```
+
+For redundancy, deploy **multiple independent** domains/servers, with matching
+`YOUFREE_TOKEN`, and enter each actual address into YouFree settings. Do not use
+untrusted public proxies. Update the relay HTTPS certificates before expiry.
+
+## Run / build Android APK
+
+- To build locally, download the trusted libXray Android AAR into
+  `app/libs/libXray.aar` first, then open this repository folder in Android
+  Studio and sync with Gradle.
+- Install SDK platform 35 and configure Gradle/JDK 17. Build > Build APK(s).
+- To build automatically from a phone, create a GitHub repository and push the
+  **contents** of the `YouFree` folder. Open **Actions > Build YouFree APK >
+  Run workflow**. After success open the run, **Artifacts > YouFree-Android-APK**,
+  download the artifact ZIP on your phone, extract `YouFree.apk` and open it.
+- Android may ask you to allow APK installation from that file manager. Enable
+  permission for that source only if you trust the repository and its build.
+- For the *optional legacy backend* functionality, open settings and enter
+  `https://YOUR_REAL_DOMAIN` and the server token, adding spare domains on
+  separate lines. This is **not** needed for the new Happ-compatible route.
+- YouTube metadata depends on your API key and YouTube API quotas. Do not place
+  `YOUTUBE_API_KEY` or Google user credentials inside the Android application.
+
+CI uses **Gradle 8.11.1**, **Android Gradle Plugin 8.9.2**, **Kotlin 2.1.20**,
+**compileSdk 35**; a checked-in Gradle wrapper JAR is not included because the
+runtime environment cannot fetch binaries. GitHub Actions installs Gradle via
+`gradle/actions/setup-gradle` and produces `YouFree.apk` on a successful build.
+
+## Tests run in development environment
+
+```sh
+cd backend
+ go test ./...
+ go test -race ./...
+```
+
+Unit/integration tests check authentication, allowlisted CONNECT targets,
+YouTube API metadata mapping (mock), and HTTP 206 Range responses.
+`testmedia/playlist.m3u8` is self-generated H.264/AAC test content; you can
+regenerate with `cd backend && ./generate-test-hls.sh`.
+
+## Troubleshooting
+
+- **No feed:** verify `YOUTUBE_API_KEY`, server status, token and API quota.
+- **Relay unreachable:** DNS resolution/TLS cert/ISP filtering/firewall; use a
+  separately deployed standby server that is reachable from the phone.
+- **WebView error 153:** embedded player may require proper `Referer` and
+  Google may reject some embed contexts. This is not fixed by proxy alone.
+- **Videos stall:** the iframe attempts one/two automatic relay retries after a
+  prolonged buffering state, otherwise use "Сменить маршрут". TLS connections
+  cannot be transplanted between servers midstream.
+- **Unsupported WebView PROXY_OVERRIDE:** update Android System WebView;
+  if still unsupported, only direct embedded playback can be used.
+- **Media3 sample gives 401:** configure matching token/server and enable media
+  via `SAMPLE_MEDIA_DIR` (Docker compose default does this).
+- **Background playback:** not supported for official YouTube iframe.
+
+## Privacy and security
+
+- No `VpnService`, root access, password capture or Google OAuth token logging.
+- `YOUFREE_TOKEN` is encrypted at rest using Android Keystore AES-GCM.
+- Upstream TLS certificate verification and hostname checking are enabled.
+- The **previous Go relay and Kotlin CONNECT proxy** restrict CONNECT to
+  allowed Google hosts:443. The **new Xray mode** routes WebView traffic through
+  whichever user-supplied server was selected; it does not apply this allowlist.
+- Self-hosting is important; the relay can log destination SNI/hosts, IPs and
+  connection sizes, though it cannot decrypt Google's end-to-end HTTPS session.
+- Both local proxy variants listen on random loopback TCP ports when active;
+  other local apps may technically connect to them. The Happ/Xray mode has no
+  local-proxy authentication, so this is a security consideration for release.
+- For production, audit, pin dependency versions, add monitoring/quotas and
+  test every major phone/WebView release; this is a starting codebase, not a
+  certified/commercial streaming service.
+
+Official documentation:
+- https://developers.google.com/youtube/terms/developer-policies
+- https://developers.google.com/youtube/iframe_api_reference
+- https://developer.android.com/reference/androidx/webkit/ProxyController
+- https://support.google.com/youtube/answer/171780

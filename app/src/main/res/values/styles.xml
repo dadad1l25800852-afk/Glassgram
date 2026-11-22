@@ -1,0 +1,7 @@
+<resources>
+    <style name="Theme.YouFree" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">#101014</item>
+        <item name="android:navigationBarColor">#101014</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>
