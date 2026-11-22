@@ -46,9 +46,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p app/libs
-          gh release download v26.11.9 -R XTLS/libXray -p '*.aar' -D app/libs
-          find app/libs -name '*.aar' -maxdepth 1 -print
-          test -f app/libs/libXray.aar || (find app/libs -maxdepth 1 -name '*.aar' -type f | grep -q . && mv "$(find app/libs -maxdepth 1 -name '*.aar' -type f | head -n1)" app/libs/libXray.aar)
+          gh release download v26.11.9 -R XTLS/libXray -p 'libxray-android.zip' -D "$RUNNER_TEMP"
+          mkdir -p "$RUNNER_TEMP/libxray-android"
+          unzip -q "$RUNNER_TEMP/libxray-android.zip" -d "$RUNNER_TEMP/libxray-android"
+          AAR_PATH="$(find "$RUNNER_TEMP/libxray-android" -type f -name '*.aar' -print -quit)"
+          if [ -z "$AAR_PATH" ]; then
+            echo "::error::Official libxray-android.zip does not contain an .aar file"
+            find "$RUNNER_TEMP/libxray-android" -maxdepth 3 -type f
+            exit 1
+          fi
+          cp "$AAR_PATH" app/libs/libXray.aar
           sha256sum app/libs/libXray.aar
       - name: Assemble Android APK
         run: gradle --no-daemon --stacktrace :app:assembleDebug
