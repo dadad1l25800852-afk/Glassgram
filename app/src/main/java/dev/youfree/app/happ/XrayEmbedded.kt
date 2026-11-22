@@ -104,5 +104,27 @@ class XrayEmbedded {
         return port
     }
 
+
+    /**
+     * Android VpnService owns the TUN FD; Xray's native TUN inbound receives it
+     * through XRAY_TUN_FD, set by YouFreeVpnService before this call.
+     *
+     * The Android VPN builder, not Xray, installs OS routes. Outbound sockets
+     * are bound to the pre-VPN physical interface to avoid recursive tunneling.
+     */
+    fun startTun(node: Node, physicalInterface: String) {
+        require(physicalInterface.matches(Regex("[A-Za-z0-9_.-]{2,32}"))) {
+            "Неизвестный сетевой интерфейс"
+        }
+        val outbound = JSONObject(node.outbound.toString()).put("tag", "selected")
+        val inbound = JSONObject().put("tag", "youfree-tun").put("protocol", "tun")
+            .put("settings", JSONObject().put("mtu", 1500)
+                .put("autoOutboundsInterface", physicalInterface))
+        val config = JSONObject().put("log", JSONObject().put("loglevel", "warning"))
+            .put("inbounds", JSONArray().put(inbound))
+            .put("outbounds", JSONArray().put(outbound))
+        invoke("runXray", JSONObject().put("xrayJson", config.toString()))
+    }
+
     fun stop() { invoke("stopXray") }
 }
