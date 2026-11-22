@@ -12,9 +12,13 @@ android {
         applicationId = "dev.youfree.app"
         minSdk = 29
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.3.0-beta-control"
+        versionCode = 4
+        versionName = "0.3.1-arm64-beta-control"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // A small phone-specific CI APK; ordinary local builds remain universal.
+        if (project.findProperty("youfreeAbi")?.toString() == "arm64-v8a") {
+            ndk { abiFilters.add("arm64-v8a") }
+        }
     }
     buildTypes {
         release {
