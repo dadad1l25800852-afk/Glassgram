@@ -11,7 +11,7 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 /** The token is for a self-hosted YouFree relay, never a Google account token. */
-data class AppConfig(val servers: List<String>, val token: String, val dark: Boolean = true, val happLink: String = "") {
+data class AppConfig(val servers: List<String>, val token: String, val dark: Boolean = true, val happLink: String = "", val dpiLink: String = "") {
     fun valid(): Boolean = servers.isNotEmpty() && servers.all {
         runCatching { val u = java.net.URI(it); u.scheme == "https" && !u.host.isNullOrBlank() && (u.path.isNullOrBlank() || u.path == "/") }.getOrDefault(false)
     } && token.length >= 24 && token.all { it.code in 33..126 }
@@ -47,11 +47,13 @@ class ConfigStore(context: Context) {
         prefs.getString("servers", "")!!.lineSequence().filter { it.isNotBlank() }.toList(),
         decrypt(prefs.getString("token", "")!!),
         prefs.getBoolean("dark", true),
-        decrypt(prefs.getString("happLink", "")!!)
+        decrypt(prefs.getString("happLink", "")!!),
+        decrypt(prefs.getString("dpiLink", "")!!)
     )
     fun save(c: AppConfig) {
         prefs.edit().putString("servers", c.servers.joinToString("\n"))
             .putString("token", encrypt(c.token)).putBoolean("dark", c.dark)
-            .putString("happLink", encrypt(c.happLink)).apply()
+            .putString("happLink", encrypt(c.happLink))
+            .putString("dpiLink", encrypt(c.dpiLink)).apply()
     }
 }
