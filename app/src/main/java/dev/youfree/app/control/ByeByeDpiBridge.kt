@@ -52,7 +52,16 @@ object ByeByeDpiBridge {
             try {
                 require(conn.responseCode == 200) { "HTTP " + conn.responseCode }
                 require(conn.contentLengthLong <= 4096) { "Файл стратегии слишком большой" }
-                val bytes = conn.inputStream.use { it.readNBytes(4097) }
+                val bytes = conn.inputStream.use { stream ->
+                    val buffer = ByteArray(4097)
+                    var count = 0
+                    while (count < buffer.size) {
+                        val n = stream.read(buffer, count, buffer.size - count)
+                        if (n < 0) break
+                        count += n
+                    }
+                    buffer.copyOf(count)
+                }
                 require(bytes.size <= 4096) { "Файл стратегии слишком большой" }
                 String(bytes, Charsets.UTF_8).trim()
             } finally { conn.disconnect() }
