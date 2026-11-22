@@ -10,7 +10,6 @@ import android.net.ConnectivityManager
 import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
-import android.system.Os
 import dev.youfree.app.MainActivity
 import dev.youfree.app.happ.XrayEmbedded
 import org.json.JSONObject
@@ -67,11 +66,10 @@ class YouFreeVpnService : VpnService() {
                 builder.addAllowedApplication("com.google.android.youtube")
                 setUnderlyingNetworks(arrayOf(network))
                 tun = builder.establish() ?: error("Android не создал VPN-интерфейс")
-                // Go Xray uses a duplicate of this FD; we hold the original.
-                Os.setenv("XRAY_TUN_FD", tun!!.fd.toString(), true)
+                // libXray gets the duplicated TUN FD from Xray config-root env.
                 val outbound = JSONObject(outboundJson).put("tag", "selected")
                 core = XrayEmbedded()
-                core!!.startTun(XrayEmbedded.Node("Выбранный сервер", outbound), interfaceName)
+                core!!.startTun(XrayEmbedded.Node("Выбранный сервер", outbound), interfaceName, tun!!.fd)
                 running = true
             } catch (e: Exception) {
                 lastError = "VPN не запущен: " + (e.message ?: e.javaClass.simpleName)
@@ -106,7 +104,6 @@ class YouFreeVpnService : VpnService() {
         core = null
         runCatching { tun?.close() }
         tun = null
-        runCatching { Os.unsetenv("XRAY_TUN_FD") }
         super.onDestroy()
     }
 }
