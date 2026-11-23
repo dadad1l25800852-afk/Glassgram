@@ -1,304 +1,539 @@
 package dev.youfree.app
 
-import android.app.PictureInPictureParams
-import android.content.Intent
-import android.net.Uri
-import android.net.VpnService
-import android.os.Build
-import android.os.Bundle
-import android.provider.Settings
-import android.util.Rational
+import android.app.Activity
+import android.content.pm.ActivityInfo
+import android.graphics.Color as AndroidColor
+import android.view.View
+import android.view.ViewGroup
+import android.view.WindowManager
+import android.webkit.WebChromeClient
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.webkit.WebSettings
+import android.widget.FrameLayout
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.VerticalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.youfree.app.control.ByeByeDpiBridge
-import dev.youfree.app.control.OverlayService
-import dev.youfree.app.control.YouFreeVpnService
-import dev.youfree.app.data.ConfigStore
-import dev.youfree.app.happ.HappSubscription
-import dev.youfree.app.happ.XrayEmbedded
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
+import androidx.compose.ui.viewinterop.AndroidView
+import coil.compose.AsyncImage
+import dev.youfree.app.data.LocalVideoStore
+import dev.youfree.app.data.SettingsStore
+import dev.youfree.app.data.UserSettings
+import dev.youfree.app.data.Video
+import dev.youfree.app.data.VideoCatalog
+import dev.youfree.app.network.ConnectionMode
+import dev.youfree.app.network.RouteManager
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
-/**
- * YouFree is a companion for the Google-signed YouTube application.
- * Nothing is injected into, repackaged from or impersonates Google's APK.
- */
+private val RED = Color(0xFFFF0033)
+private val BLACK = Color(0xFF0F0F0F)
+private val CARD = Color(0xFF202020)
+private val GREY = Color(0xFFBDBDBD)
+private enum class Tab { HOME, SHORTS, SEARCH, NETWORK, LIBRARY }
+
 class MainActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
+    override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { ControlScreen() }
+        window.statusBarColor = android.graphics.Color.rgb(15,15,15)
+        window.navigationBarColor = android.graphics.Color.rgb(15,15,15)
+        setContent { YouFreeApplication(this) }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@Composable
+private fun YouFreeApplication(activity: MainActivity) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val prefs = remember { SettingsStore(context) }
+    var settings by remember { mutableStateOf(prefs.load()) }
+    val history = remember { LocalVideoStore(context) }
+    val routes = remember { RouteManager(context.applicationContext) }
+    val connection by routes.status.collectAsState()
+    val catalog = remember { VideoCatalog(routes) }
+    var tab by remember { mutableStateOf(Tab.HOME) }
+    var playing by remember { mutableStateOf<Video?>(null) }
+    var feed by remember { mutableStateOf<List<Video>>(emptyList()) }
+    var shortVideos by remember { mutableStateOf<List<Video>>(emptyList()) }
+    var searchVideos by remember { mutableStateOf<List<Video>>(emptyList()) }
+    var searchText by remember { mutableStateOf("") }
+    var loading by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf("") }
+    var networkMode by remember { mutableStateOf(ConnectionMode.VPN) }
+    var vpnText by remember { mutableStateOf(settings.vpnLink) }
+    var dpiText by remember { mutableStateOf(settings.dpiStrategy) }
+    var keyText by remember { mutableStateOf(settings.apiKey) }
+    var showApiKey by remember { mutableStateOf(false) }
+    var savedRevision by remember { mutableIntStateOf(0) }
+
+    fun save(updated: UserSettings) {
+        settings = updated
+        prefs.save(updated)
+    }
+    fun openVideo(video: Video) {
+        history.savePlayed(video)
+        playing = video
+    }
+    fun findVideo() {
+        val query = searchText.trim()
+        if (query.isEmpty()) { message = "Напиши название видео"; return }
+        scope.launch {
+            loading = true
+            message = ""
+            try { searchVideos = catalog.search(settings.apiKey, query) }
+            catch (e: Exception) { message = e.message ?: "Ошибка поиска" }
+            finally { loading = false }
+        }
     }
 
-    // Kept for the optional legacy playback UI compiled in the same module.
-    fun enterVideoPip() {
-        enterPictureInPictureMode(
-            PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9)).build()
-        )
+    LaunchedEffect(settings.apiKey, connection.revision) {
+        loading = true
+        message = ""
+        try { feed = catalog.home(settings.apiKey) }
+        catch (e: Exception) { message = "Лента: " + (e.message ?: "сеть недоступна") }
+        finally { loading = false }
     }
-
-    @Composable
-    private fun ControlScreen() {
-        val context = LocalContext.current
-        val scope = rememberCoroutineScope()
-        val store = remember { ConfigStore(context) }
-        val xray = remember { XrayEmbedded() }
-        var link by remember { mutableStateOf(store.load().happLink) }
-        var dpiInput by remember { mutableStateOf(store.load().dpiLink) }
-        var busy by remember { mutableStateOf(false) }
-        var message by remember { mutableStateOf("Вставь VLESS/Trojan/SS/HTTPS-подписку или выбери ByeByeDPI.") }
-        var chosen by remember { mutableStateOf<XrayEmbedded.Node?>(null) }
-        var vpnActive by remember { mutableStateOf(YouFreeVpnService.running) }
-
-        fun startSelected() {
-            val node = chosen ?: return
-            val intent = Intent(context, YouFreeVpnService::class.java)
-                .setAction(YouFreeVpnService.ACTION_CONNECT)
-                .putExtra(YouFreeVpnService.EXTRA_OUTBOUND, node.outbound.toString())
-            context.startForegroundService(intent)
-            message = "Запуск VPN только для приложения YouTube…"
+    LaunchedEffect(tab, settings.apiKey, connection.revision) {
+        if (tab == Tab.SHORTS && settings.apiKey.isNotBlank()) {
+            runCatching { shortVideos = catalog.shorts(settings.apiKey) }
+                .onFailure { message = it.message ?: "Shorts недоступны" }
         }
+    }
+    BackHandler(enabled = playing != null) { playing = null }
 
-        val vpnPermission = rememberLauncherForActivityResult(
-            ActivityResultContracts.StartActivityForResult()
-        ) { result ->
-            if (result.resultCode == RESULT_OK) startSelected()
-            else message = "Android не разрешил запуск VPN."
-        }
+    val colors = darkColorScheme(primary = RED, background = BLACK,
+        surface = BLACK, surfaceVariant = CARD, onBackground = Color.White,
+        onSurface = Color.White, onSurfaceVariant = GREY)
 
-        LaunchedEffect(Unit) {
-            while (true) {
-                vpnActive = YouFreeVpnService.running
-                val error = YouFreeVpnService.lastError
-                if (error.isNotBlank()) message = error
-                delay(1250)
-            }
-        }
-
-        val youtubePackage = "com.google.android.youtube"
-        val installedVersion = remember {
-            runCatching {
-                @Suppress("DEPRECATION")
-                context.packageManager.getPackageInfo(youtubePackage, 0).versionName
-            }.getOrNull()
-        }
-        val red = Color(0xFFFF0033)
-        val black = Color(0xFF0F0F0F)
-        val surface = Color(0xFF202020)
-        val scheme = darkColorScheme(
-            primary = red, background = black, surface = black,
-            surfaceVariant = surface, onBackground = Color.White, onSurface = Color.White
-        )
-
-        MaterialTheme(colorScheme = scheme) {
-            Surface(color = black, modifier = Modifier.fillMaxSize()) {
-                Column(
-                    Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
-                        .padding(horizontal = 20.dp, vertical = 28.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("▶", color = red, fontSize = 34.sp, fontWeight = FontWeight.Bold)
+    MaterialTheme(colorScheme = colors) {
+        if (playing != null) {
+            PlayerPage(activity, playing!!,
+                onBack = { playing = null },
+                onSave = {
+                    history.toggleSaved(playing!!)
+                    savedRevision++
+                },
+                isSaved = history.saved().any { it.id == playing!!.id },
+                routeRevision = connection.revision)
+        } else {
+            Scaffold(containerColor = BLACK, topBar = {
+                Row(Modifier.fillMaxWidth().height(55.dp).padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.PlayCircleFilled, "YouFree", tint = RED,
+                        modifier = Modifier.size(32.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("YouFree", fontSize = 23.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.weight(1f))
+                    if (connection.mode != ConnectionMode.DIRECT) {
+                        Icon(Icons.Default.Shield, "Маршрут подключён", tint = Color(0xFF68D391))
                         Spacer(Modifier.width(10.dp))
-                        Column {
-                            Text("YouFree", fontSize = 26.sp, fontWeight = FontWeight.Bold)
-                            Text("Панель подключения к YouTube", color = Color.LightGray, fontSize = 12.sp)
-                        }
                     }
-
-                    Card(colors = CardDefaults.cardColors(containerColor = surface)) {
-                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("ОРИГИНАЛЬНЫЙ YOUTUBE", color = Color.LightGray,
-                                style = MaterialTheme.typography.labelSmall)
-                            Text(
-                                if (installedVersion == null) "YouTube не обнаружен"
-                                else "Установлен YouTube " + installedVersion,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text("Последняя замеченная бета: 21.47.483 (23.11.2026). " +
-                                "YouFree не изменяет APK Google и не включает его в свою сборку.",
-                                color = Color.LightGray, fontSize = 12.sp)
-                            Button(
-                                onClick = {
-                                    val launch = context.packageManager.getLaunchIntentForPackage(youtubePackage)
-                                    if (launch != null) context.startActivity(launch)
-                                    else context.startActivity(
-                                        Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=com.google.android.youtube"))
-                                    )
-                                }, modifier = Modifier.fillMaxWidth(),
-                                colors = ButtonDefaults.buttonColors(containerColor = red)
-                            ) { Text("▶  Открыть YouTube", color = Color.White) }
-                            TextButton(onClick = {
-                                context.startActivity(Intent(Intent.ACTION_VIEW,
-                                    Uri.parse("https://play.google.com/apps/testing/com.google.android.youtube")))
-                            }) { Text("Программа бета-тестирования YouTube") }
-                        }
+                    IconButton(onClick = { tab = Tab.SEARCH }) {
+                        Icon(Icons.Default.Search, "Поиск", tint = Color.White)
                     }
-
-                    Card(colors = CardDefaults.cardColors(containerColor = surface)) {
-                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("VPN-подписка", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                                Spacer(Modifier.weight(1f))
-                                Text(if (vpnActive) "● Активно" else "○ Выключено",
-                                    color = if (vpnActive) Color(0xFF69DB7C) else Color.LightGray)
-                            }
-                            Text(
-                                "Подключение через Xray. Android запросит разрешение VPN. " +
-                                "Только трафик приложения YouTube идёт через выбранный сервер.",
-                                color = Color.LightGray, fontSize = 12.sp
+                    IconButton(onClick = { tab = Tab.NETWORK }) {
+                        Icon(Icons.Default.Settings, "Сеть", tint = Color.White)
+                    }
+                }
+            }, bottomBar = {
+                NavigationBar(containerColor = BLACK, tonalElevation = 0.dp) {
+                    listOf(
+                        Triple(Tab.HOME, "Главная", Icons.Default.Home),
+                        Triple(Tab.SHORTS, "Shorts", Icons.Default.SmartDisplay),
+                        Triple(Tab.SEARCH, "Поиск", Icons.Default.Search),
+                        Triple(Tab.NETWORK, "Сеть", Icons.Default.Wifi),
+                        Triple(Tab.LIBRARY, "Вы", Icons.Default.AccountCircle)
+                    ).forEach { (target, title, icon) ->
+                        NavigationBarItem(
+                            selected = tab == target,
+                            onClick = { tab = target },
+                            icon = { Icon(icon, contentDescription = title) },
+                            label = { Text(title, fontSize = 10.sp) },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = Color.White,
+                                selectedTextColor = Color.White,
+                                indicatorColor = CARD,
+                                unselectedIconColor = GREY,
+                                unselectedTextColor = GREY
                             )
-                            OutlinedTextField(
-                                value = link, onValueChange = { link = it }, label = { Text("Ссылка или подписка") },
-                                placeholder = { Text("vless://… или https://…") },
-                                modifier = Modifier.fillMaxWidth(), minLines = 2, maxLines = 4
-                            )
-                            Button(
-                                modifier = Modifier.fillMaxWidth(),
-                                enabled = !busy && link.isNotBlank(),
-                                onClick = {
-                                    if (busy) return@Button
-                                    busy = true
-                                    message = "Загружаю подписку и проверяю доступность серверов…"
-                                    scope.launch {
-                                        try {
-                                            val node = withContext(Dispatchers.IO) {
-                                                val nodes = xray.decodeOpenSubscription(HappSubscription().import(link))
-                                                val ranked = xray.benchmark(nodes)
-                                                ranked.firstOrNull { it.delayMs != null }
-                                                    ?: error("Ни один сервер не ответил на проверку YouTube")
-                                            }
-                                            chosen = node
-                                            val cfg = store.load()
-                                            store.save(cfg.copy(happLink = link.trim(), dark = true))
-                                            message = "Выбран: " + node.name + " (" + node.delayMs + " мс)."
-                                            val permission = VpnService.prepare(context)
-                                            if (permission != null) vpnPermission.launch(permission)
-                                            else startSelected()
-                                        } catch (e: Exception) {
-                                            message = "Ошибка: " + (e.message ?: e.javaClass.simpleName)
-                                        } finally { busy = false }
+                        )
+                    }
+                }
+            }) { padding ->
+                Box(Modifier.fillMaxSize().padding(padding)) {
+                    when (tab) {
+                        Tab.HOME -> Column {
+                            Row(Modifier.horizontalScrollCompat().padding(12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                                listOf("Все", "Музыка", "Игры", "Новости", "Прямые эфиры")
+                                    .forEach { tag ->
+                                        Surface(shape = RoundedCornerShape(9.dp), color = CARD) {
+                                            Text(tag, Modifier.padding(horizontal = 13.dp,
+                                                vertical = 8.dp), color = Color.White,
+                                                fontSize = 13.sp)
+                                        }
                                     }
-                                }
-                            ) { Text(if (busy) "Проверка…" else "⚡  Выбрать лучший сервер и подключить") }
-                            OutlinedButton(
-                                onClick = {
-                                    context.startService(
-                                        Intent(context, YouFreeVpnService::class.java)
-                                            .setAction(YouFreeVpnService.ACTION_STOP)
-                                    )
-                                    message = "Отключение запрошено."
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) { Text("Отключить VPN") }
-                        }
-                    }
-
-                    Card(colors = CardDefaults.cardColors(containerColor = surface)) {
-                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Text("ByeByeDPI", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                            Text(
-                                "Режим локального обхода DPI. Открывается установленное " +
-                                "приложение ByeByeDPI через его командный интерфейс. " +
-                                "Использует Android VPN-режим, но не удалённый VPN-сервер.",
-                                color = Color.LightGray, fontSize = 12.sp
-                            )
-                            OutlinedTextField(
-                                value = dpiInput, onValueChange = { dpiInput = it },
-                                label = { Text("Ссылка на стратегию или параметры") },
-                                placeholder = { Text("https://…/strategy.txt или -s1 …") },
-                                modifier = Modifier.fillMaxWidth(),
-                                minLines = 2, maxLines = 3
-                            )
-                            Button(onClick = {
-                                if (!ByeByeDpiBridge.installed(context)) {
-                                    context.startActivity(Intent(Intent.ACTION_VIEW,
-                                        Uri.parse("https://github.com/romanvht/ByeByeDPI")))
-                                    message = "Сначала установи ByeByeDPI и один раз разреши ему VPN."
-                                } else {
-                                    busy = true
-                                    scope.launch {
-                                        try {
-                                            val strategy = ByeByeDpiBridge.resolveStrategy(dpiInput)
-                                            store.save(store.load().copy(dpiLink = dpiInput.trim()))
-                                            ByeByeDpiBridge.start(context, strategy)
-                                            message = "Команда запуска отправлена ByeByeDPI. " +
-                                                "Если изменил стратегию при активном подключении, " +
-                                                "останови и запусти его заново."
-                                        } catch (e: Exception) {
-                                            message = "Ошибка ByeByeDPI: " + (e.message ?: "неизвестная")
-                                        } finally { busy = false }
-                                    }
-                                }
-                            }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
-                                Text("▶  Запустить ByeByeDPI")
                             }
-                            OutlinedButton(onClick = {
-                                runCatching { ByeByeDpiBridge.stop(context) }
-                                    .onSuccess { message = "Отправлена команда остановки ByeByeDPI." }
-                                    .onFailure { message = it.message ?: "Не удалось остановить ByeByeDPI" }
-                            }, modifier = Modifier.fillMaxWidth()) { Text("Остановить ByeByeDPI") }
-                            TextButton(onClick = {
-                                val launch = context.packageManager.getLaunchIntentForPackage(
-                                    ByeByeDpiBridge.PACKAGE_NAME
+                            if (feed.isEmpty()) {
+                                EmptyFeed(message.ifBlank {
+                                    if (loading) "Загружаю настоящие видео…"
+                                    else "Не удалось получить видео. Проверь сеть или настрой API."
+                                }, onNetwork = { tab = Tab.NETWORK })
+                            } else {
+                                VideoFeed(feed, ::openVideo)
+                            }
+                        }
+
+                        Tab.SEARCH -> Column {
+                            Row(Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically) {
+                                OutlinedTextField(
+                                    value = searchText,
+                                    onValueChange = { searchText = it },
+                                    modifier = Modifier.weight(1f),
+                                    singleLine = true,
+                                    label = { Text("Искать на YouTube") }
                                 )
-                                if (launch != null) context.startActivity(launch)
-                                else context.startActivity(Intent(Intent.ACTION_VIEW,
-                                    Uri.parse("https://github.com/romanvht/ByeByeDPI")))
-                            }) { Text("Настройки / установить ByeByeDPI") }
-                            Text("Одновременно может быть активен только один Android VPN.",
-                                color = Color.LightGray, fontSize = 12.sp)
-                        }
-                    }
-
-                    Card(colors = CardDefaults.cardColors(containerColor = surface)) {
-                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("КНОПКА ПОВЕРХ YOUTUBE", fontWeight = FontWeight.Bold)
-                            Text("Тёмная плавающая кнопка ▶ появляется поверх официального YouTube. " +
-                                "Касание открывает эту панель, перетаскивание меняет положение.",
-                                color = Color.LightGray, fontSize = 12.sp)
-                            Button(onClick = {
-                                if (Settings.canDrawOverlays(context)) {
-                                    context.startForegroundService(Intent(context, OverlayService::class.java))
-                                    message = "Кнопка включена. Открой YouTube."
-                                } else {
-                                    context.startActivity(Intent(
-                                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                        Uri.parse("package:" + context.packageName)
-                                    ))
-                                    message = "Разреши отображение поверх других приложений, затем включи кнопку."
+                                IconButton(onClick = ::findVideo) {
+                                    Icon(Icons.Default.Search, "Найти")
                                 }
-                            }, modifier = Modifier.fillMaxWidth()) { Text("Включить плавающую кнопку") }
+                            }
+                            if (message.isNotBlank()) {
+                                Text(message, Modifier.padding(15.dp), color = GREY)
+                            }
+                            if (searchVideos.isEmpty()) {
+                                EmptyFeed(
+                                    if (settings.apiKey.isBlank())
+                                        "Для настоящего поиска нужен YouTube Data API key. Добавь его на вкладке «Сеть»."
+                                    else "Напиши запрос и нажми поиск.",
+                                    { tab = Tab.NETWORK }
+                                )
+                            } else VideoFeed(searchVideos, ::openVideo)
+                        }
+
+                        Tab.SHORTS -> {
+                            if (shortVideos.isEmpty()) {
+                                EmptyFeed(
+                                    "Shorts: для загрузки коротких роликов нужен YouTube Data API key. Это поиск коротких видео, не официальный Shorts feed.",
+                                    { tab = Tab.NETWORK }
+                                )
+                            } else {
+                                val pager = rememberPagerState(pageCount = { shortVideos.size })
+                                VerticalPager(state = pager) { index ->
+                                    Box(Modifier.fillMaxSize().background(Color.Black)) {
+                                        PlayerEmbed(activity, shortVideos[index].id,
+                                            connection.revision, modifier = Modifier.fillMaxSize())
+                                        Text(shortVideos[index].title,
+                                            Modifier.align(Alignment.BottomStart)
+                                                .padding(20.dp)
+                                                .background(Color(0x99000000))
+                                                .padding(9.dp),
+                                            maxLines = 2)
+                                    }
+                                }
+                            }
+                        }
+
+                        Tab.NETWORK -> Column(
+                            Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Text("Сеть и подключение", fontSize = 25.sp,
+                                fontWeight = FontWeight.Bold)
+                            Surface(color = CARD, shape = RoundedCornerShape(16.dp)) {
+                                Column(Modifier.padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text("ТЕКУЩЕЕ СОЕДИНЕНИЕ",
+                                        style = MaterialTheme.typography.labelSmall, color = GREY)
+                                    Text(connection.text, fontWeight = FontWeight.SemiBold)
+                                    if (connection.videoTestPassed == false) {
+                                        Text("Проверка YouTube не прошла. Это не означает, что видео точно заработает.",
+                                            color = Color(0xFFFFB86B), fontSize = 12.sp)
+                                    }
+                                    OutlinedButton(onClick = { scope.launch { routes.direct() } },
+                                        enabled = !connection.busy) { Text("Прямое подключение / отключить") }
+                                }
+                            }
+                            Text("Выбери способ", fontWeight = FontWeight.Bold)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                FilterChip(
+                                    selected = networkMode == ConnectionMode.VPN,
+                                    onClick = { networkMode = ConnectionMode.VPN },
+                                    label = { Text("VPN / Xray") }
+                                )
+                                FilterChip(
+                                    selected = networkMode == ConnectionMode.BYEDPI,
+                                    onClick = { networkMode = ConnectionMode.BYEDPI },
+                                    label = { Text("ByeByeDPI") }
+                                )
+                            }
+                            if (networkMode == ConnectionMode.VPN) {
+                                Text("Встроенный Xray. Вставь VLESS, Trojan, Shadowsocks или HTTPS-подписку. Выбирается доступный сервер с минимальной задержкой.",
+                                    fontSize = 13.sp, color = GREY)
+                                OutlinedTextField(
+                                    value = vpnText, onValueChange = { vpnText = it },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    label = { Text("Ссылка на VPN / подписку") },
+                                    placeholder = { Text("vless://… или https://…") },
+                                    minLines = 2, maxLines = 4
+                                )
+                                Button(
+                                    onClick = {
+                                        save(settings.copy(vpnLink = vpnText.trim()))
+                                        scope.launch { routes.vpn(vpnText) }
+                                    },
+                                    enabled = !connection.busy && vpnText.isNotBlank(),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Default.Bolt, null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Проверить и подключить")
+                                }
+                            } else {
+                                Text("Настоящий ByeDPI включён в APK. Никаких отдельных приложений и root. Укажи параметры запуска локального DPI-движка.",
+                                    fontSize = 13.sp, color = GREY)
+                                OutlinedTextField(
+                                    value = dpiText, onValueChange = { dpiText = it },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    label = { Text("Параметры ByeDPI") },
+                                    placeholder = { Text("--tlsrec 3+s") },
+                                    minLines = 2, maxLines = 3
+                                )
+                                Button(
+                                    onClick = {
+                                        save(settings.copy(dpiStrategy = dpiText))
+                                        scope.launch { routes.byedpi(dpiText) }
+                                    },
+                                    enabled = !connection.busy,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Default.Bolt, null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Включить ByeDPI")
+                                }
+                                Text("Работает только в YouFree. Некоторые провайдеры блокируют видео и после обхода DPI.",
+                                    fontSize = 12.sp, color = GREY)
+                            }
+                            HorizontalDivider(color = CARD)
+                            Text("Данные YouTube", fontWeight = FontWeight.SemiBold)
+                            OutlinedTextField(
+                                value = keyText, onValueChange = { keyText = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                label = { Text("YouTube Data API v3 key") },
+                                visualTransformation = if (showApiKey)
+                                    androidx.compose.ui.text.input.VisualTransformation.None
+                                else PasswordVisualTransformation()
+                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(checked = showApiKey,
+                                    onCheckedChange = { showApiKey = it })
+                                Text("Показать API key")
+                            }
                             OutlinedButton(onClick = {
-                                context.stopService(Intent(context, OverlayService::class.java))
-                                message = "Плавающая кнопка выключена."
-                            }, modifier = Modifier.fillMaxWidth()) { Text("Скрыть кнопку") }
+                                save(settings.copy(apiKey = keyText.trim()))
+                                message = "Ключ сохранён. Вернись на главную."
+                            }) { Text("Сохранить ключ для ленты и поиска") }
+                            Text("Проигрыватель использует официальный YouTube iframe. Google-авторизация, лайки и премиум-функции не реализованы.",
+                                fontSize = 12.sp, color = GREY)
+                        }
+
+                        Tab.LIBRARY -> Column {
+                            Text("Ваша библиотека", Modifier.padding(16.dp),
+                                fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                            Text("Сохранённое", Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                                fontWeight = FontWeight.SemiBold)
+                            val saved = remember(savedRevision) { history.saved() }
+                            if (saved.isNotEmpty()) VideoFeed(saved, ::openVideo, Modifier.weight(1f))
+                            else {
+                                Text("Добавляй ролики из проигрывателя кнопкой «Сохранить».",
+                                    Modifier.padding(16.dp), color = GREY)
+                                Text("История просмотров", Modifier.padding(16.dp),
+                                    fontWeight = FontWeight.SemiBold)
+                                val viewed = history.history()
+                                if (viewed.isNotEmpty()) VideoFeed(viewed, ::openVideo)
+                            }
                         }
                     }
-
-                    Text(message, color = Color.White, fontSize = 13.sp)
-                    Text("Без root. Для VPN требуется подтверждение Android. " +
-                        "Ни YouTube, ни ByeByeDPI не принадлежат разработчику YouFree.",
-                        color = Color.Gray, fontSize = 11.sp)
+                    if (loading && tab == Tab.HOME) {
+                        LinearProgressIndicator(Modifier.fillMaxWidth().align(Alignment.TopCenter),
+                            color = RED)
+                    }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun Modifier.horizontalScrollCompat(): Modifier = this.then(
+    Modifier.horizontalScroll(rememberScrollState())
+)
+
+@Composable
+private fun EmptyFeed(message: String, onNetwork: () -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(26.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Icon(Icons.Default.PlayCircleOutline, null,
+            modifier = Modifier.size(50.dp), tint = RED)
+        Text(message, color = GREY, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        OutlinedButton(onClick = onNetwork) {
+            Icon(Icons.Default.Wifi, null)
+            Spacer(Modifier.width(8.dp))
+            Text("Настроить подключение")
+        }
+    }
+}
+
+@Composable
+private fun VideoFeed(
+    videos: List<Video>,
+    onPlay: (Video) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    LazyColumn(modifier) {
+        items(videos, key = { it.id }) { video ->
+            Column(Modifier.fillMaxWidth().clickable { onPlay(video) }
+                .padding(bottom = 19.dp)) {
+                AsyncImage(
+                    model = video.thumbnail, contentDescription = video.title,
+                    modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f),
+                    contentScale = ContentScale.Crop
+                )
+                Row(Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
+                    verticalAlignment = Alignment.Top) {
+                    Box(Modifier.size(38.dp).clip(CircleShape).background(CARD),
+                        contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.PlayArrow, null, tint = RED)
+                    }
+                    Spacer(Modifier.width(11.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(video.title, fontWeight = FontWeight.SemiBold,
+                            fontSize = 15.sp, lineHeight = 21.sp, maxLines = 2,
+                            overflow = TextOverflow.Ellipsis)
+                        Spacer(Modifier.height(3.dp))
+                        Text(video.channel, color = GREY, fontSize = 12.sp, maxLines = 1)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlayerPage(
+    activity: Activity, video: Video, onBack: () -> Unit,
+    onSave: () -> Unit, isSaved: Boolean, routeRevision: Int
+) {
+    Column(Modifier.fillMaxSize().background(BLACK)) {
+        Row(Modifier.height(54.dp).fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Назад") }
+            Text("YouFree", Modifier.weight(1f), fontWeight = FontWeight.Bold)
+        }
+        PlayerEmbed(activity, video.id, routeRevision,
+            modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f))
+        Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(15.dp)) {
+            Text(video.title, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text(video.channel, color = GREY)
+            Button(onClick = onSave) {
+                Icon(if (isSaved) Icons.Default.CheckCircle else Icons.Default.BookmarkAdd, null)
+                Spacer(Modifier.width(8.dp))
+                Text(if (isSaved) "Сохранено" else "Сохранить")
+            }
+            Text("Это официальный встраиваемый плеер YouTube. Если видео не разрешено к встраиванию, воспроизведение может быть недоступно.",
+                color = GREY, fontSize = 12.sp)
+        }
+    }
+}
+
+/**
+ * Native screen with official YouTube iframe WebView.
+ * This is not raw YouTube video extraction or a rebranded copy of Google APK.
+ */
+@Composable
+private fun PlayerEmbed(activity: Activity, videoId: String, routeRevision: Int,
+                        modifier: Modifier = Modifier) {
+    key(videoId, routeRevision) {
+        AndroidView(
+            factory = { ctx ->
+                WebView(ctx).apply {
+                    setBackgroundColor(AndroidColor.BLACK)
+                    settings.javaScriptEnabled = true
+                    settings.domStorageEnabled = true
+                    settings.mediaPlaybackRequiresUserGesture = true
+                    settings.allowFileAccess = false
+                    settings.allowContentAccess = false
+                    settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                    webViewClient = WebViewClient()
+                    webChromeClient = object : WebChromeClient() {
+                        var custom: View? = null
+                        var callback: CustomViewCallback? = null
+
+                        override fun onShowCustomView(view: View?, cb: CustomViewCallback?) {
+                            if (view == null || custom != null) { cb?.onCustomViewHidden(); return }
+                            custom = view
+                            callback = cb
+                            val decor = activity.window.decorView as ViewGroup
+                            decor.addView(view, ViewGroup.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.MATCH_PARENT))
+                            activity.window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
+                            activity.requestedOrientation =
+                                ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                        }
+                        override fun onHideCustomView() {
+                            val view = custom ?: return
+                            (view.parent as? ViewGroup)?.removeView(view)
+                            callback?.onCustomViewHidden()
+                            custom = null
+                            callback = null
+                            activity.window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
+                            activity.requestedOrientation =
+                                ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                        }
+                    }
+                    loadUrl("https://www.youtube.com/embed/" + videoId +
+                        "?playsinline=1&rel=0", mapOf("Referer" to "https://www.youtube.com/"))
+                }
+            },
+            modifier = modifier,
+            onRelease = { web ->
+                web.stopLoading()
+                web.loadUrl("about:blank")
+                web.destroy()
+            }
+        )
     }
 }

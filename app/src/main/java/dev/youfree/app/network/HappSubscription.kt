@@ -1,4 +1,4 @@
-package dev.youfree.app.happ
+package dev.youfree.app.network
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

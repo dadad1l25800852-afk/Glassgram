@@ -1,0 +1,67 @@
+name: Build native YouFree APK
+
+on:
+  push:
+    branches: [youfree-standalone, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Android SDK, NDK and CMake
+        shell: bash
+        run: |
+          SDK_DIR="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          SDKMANAGER="$(find "$SDK_DIR/cmdline-tools" -path '*/bin/sdkmanager' -type f | sort -r | head -n1)"
+          test -n "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" --install 'platforms;android-35' 'build-tools;35.0.0' 'ndk;27.2.12479018' 'cmake;3.22.1'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Get official libXray v26.11.9
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p app/libs
+          gh release download v26.11.9 -R XTLS/libXray -p 'libxray-android.zip' -D "$RUNNER_TEMP"
+          unzip -q "$RUNNER_TEMP/libxray-android.zip" -d "$RUNNER_TEMP/libxray"
+          AAR="$(find "$RUNNER_TEMP/libxray" -type f -name '*.aar' -print -quit)"
+          test -n "$AAR"
+          cp "$AAR" app/libs/libXray.aar
+      - name: Build pinned open-source ByeDPI engine in this APK
+        shell: bash
+        run: |
+          git clone https://github.com/romanvht/ByeByeDPI.git "$RUNNER_TEMP/ByeByeDPI"
+          git -C "$RUNNER_TEMP/ByeByeDPI" checkout ee87264e3bab779d3c23e41e11c45d5f8189faec
+          git -C "$RUNNER_TEMP/ByeByeDPI" submodule update --init --recursive
+          test -f "$RUNNER_TEMP/ByeByeDPI/app/src/main/cpp/byedpi/main.c"
+          mkdir -p app/src/main/cpp
+          cp -a "$RUNNER_TEMP/ByeByeDPI/app/src/main/cpp/." app/src/main/cpp/
+      - name: Compile Android APK
+        run: gradle --no-daemon --stacktrace :app:assembleDebug
+      - name: Verify packaged native engines and APK
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk YouFree.apk
+          unzip -t YouFree.apk >/dev/null
+          unzip -l YouFree.apk | grep 'lib/arm64-v8a/libbyedpi.so'
+          unzip -l YouFree.apk | grep -E 'lib/arm64-v8a/libgojni.so|lib/arm64-v8a/libxray.so' || true
+          sha256sum YouFree.apk > SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: YouFree-APK
+          path: |
+            YouFree.apk
+            SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14

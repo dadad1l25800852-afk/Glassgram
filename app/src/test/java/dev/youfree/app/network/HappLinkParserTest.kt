@@ -1,4 +1,4 @@
-package dev.youfree.app.happ
+package dev.youfree.app.network
 
 import org.junit.Assert.*
 import org.junit.Test
