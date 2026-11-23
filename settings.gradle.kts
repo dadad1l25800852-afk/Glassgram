@@ -11,3 +11,6 @@ dependencyResolutionManagement {
 }
 rootProject.name = "YouFree"
 include(":app")
+
+include(":youfree-tab")
+include(":xposed-stubs")

@@ -1,0 +1,39 @@
+name: Build YouFree YouTube in-app tab module
+
+on:
+  push:
+    branches: [youtube-native-tab]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile-module:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Android SDK 35
+        shell: bash
+        run: |
+          SDK_DIR="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          SDKMANAGER="$(find "$SDK_DIR/cmdline-tools" -path '*/bin/sdkmanager' -type f | sort -r | head -n1)"
+          test -n "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" --install 'platforms;android-35' 'build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Compile the patch module (not a modified YouTube APK)
+        run: gradle --no-daemon --stacktrace :youfree-tab:assembleDebug
+      - name: Validate module APK archive
+        run: unzip -t youfree-tab/build/outputs/apk/debug/youfree-tab-debug.apk > /dev/null
+      - uses: actions/upload-artifact@v4
+        with:
+          name: YouFree-tab-Xposed-module-NOT-Youtube
+          path: youfree-tab/build/outputs/apk/debug/youfree-tab-debug.apk
+          if-no-files-found: error
